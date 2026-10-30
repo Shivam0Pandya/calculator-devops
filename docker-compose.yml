@@ -1,9 +1,14 @@
+
 # Full stack: 2 calculator replicas behind an Nginx reverse proxy.
 # Jenkins sets DOCKERHUB_USER and IMAGE_TAG; defaults let you run it by hand too.
+
 name: calculator
 
 services:
   calculator-1: &calculator
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ${DOCKERHUB_USER:-imt2023091}/calculator:${IMAGE_TAG:-latest}
     container_name: calculator-1
     restart: unless-stopped
