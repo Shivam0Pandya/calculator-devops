@@ -1,0 +1,52 @@
+# Full stack: 2 calculator replicas behind an Nginx reverse proxy.
+# Jenkins sets DOCKERHUB_USER and IMAGE_TAG; defaults let you run it by hand too.
+name: calculator
+
+services:
+  calculator-1: &calculator
+    image: ${DOCKERHUB_USER:-imt2023091}/calculator:${IMAGE_TAG:-latest}
+    container_name: calculator-1
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: "8080"
+      APP_VERSION: ${IMAGE_TAG:-latest}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"
+    expose:
+      - "8080"
+    networks:
+      - calc-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  calculator-2:
+    <<: *calculator
+    container_name: calculator-2
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: calculator-nginx
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8090}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      calculator-1:
+        condition: service_healthy
+      calculator-2:
+        condition: service_healthy
+    networks:
+      - calc-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/nginx-health || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+networks:
+  calc-net:
+    driver: bridge
